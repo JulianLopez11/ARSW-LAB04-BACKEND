@@ -1,4 +1,4 @@
-## Laboratorio #4 – REST API Blueprints (Java 21 / Spring Boot 3.3.x)
+## Laboratorio #4 – REST API Blueprints Con Stomps (Java 21 / Spring Boot 3.3.x)
 # Escuela Colombiana de Ingeniería – Arquitecturas de Software  
 
 ---
@@ -175,43 +175,72 @@ springdoc.swagger-ui.path=/swagger-ui.html
 
 - Anota endpoints con `@Operation` y `@ApiResponse`.
 
-### 5. Filtros de *Blueprints*
 
-- Implementa filtros:
-Para implementarlos con spring podemos apregar esto al archivo .properties
-Pero solo puede haber uno activo
+### 5. Tiempo real con STOMP / WebSocket
 
-```bash
-#Punto 5
-spring.profiles.active=redundancy
-#spring.profiles.active=undersampling
+Se integró soporte de comunicación en tiempo real usando **STOMP sobre WebSocket**, permitiendo que múltiples clientes colaboren en el mismo blueprint de forma sincronizada.
+
+#### Dependencia añadida (`pom.xml`)
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-websocket</artifactId>
+</dependency>
 ```
-  - **RedundancyFilter**: elimina puntos duplicados consecutivos.  
-  #### Prueba ejecutada con el comando curl desde bash
 
-  ![alt text](docs/img/redudancy.png)
-  ---
-  - **UndersamplingFilter**: conserva 1 de cada 2 puntos. 
-   #### Prueba ejecutada con el comando curl desde bash y activando `#spring.profiles.active=undersampling`
+#### Configuración – `WebSocketConfig`
+- Anotada con `@EnableWebSocketMessageBroker`.
+- Endpoint de conexión WebSocket: **`/ws-blueprints`** (acepta cualquier origen).
+- Broker en memoria habilitado para los destinos **`/topic`** y **`/queue`**.
+- Prefijo de aplicación: **`/app`** (rutas hacia los `@MessageMapping`).
+- Prefijo de usuario: **`/user`**.
 
-  ![alt text](docs/img/under.png)
+```java
+registry.addEndpoint("/ws-blueprints").setAllowedOriginPatterns("*");
+registry.enableSimpleBroker("/topic", "/queue");
+registry.setApplicationDestinationPrefixes("/app");
+```
 
-- Activa los filtros mediante perfiles de Spring (`redundancy`, `undersampling`).  
+#### Controlador WebSocket – `BluePrintWebSocketController`
+Maneja mensajes STOMP entrantes en **`/app/draw`**:
 
----
+1. Recibe un `DrawEvent` con `author`, `name` y el nuevo `Point`.
+2. Persiste el punto llamando a `services.addPoint(...)`.
+3. Recupera el blueprint actualizado y lo difunde a todos los suscriptores de **`/topic/blueprints.{author}.{name}`**.
 
-## ✅ Entregables
+```java
+@MessageMapping("/draw")
+public void onDraw(DrawEvent evt) {
+    services.addPoint(evt.author(), evt.name(), evt.point().x(), evt.point().y());
+    Blueprint updatedBp = services.getBlueprint(evt.author(), evt.name());
+    template.convertAndSend("/topic/blueprints." + evt.author() + "." + evt.name(), updatedBp);
+}
+```
 
-1. Repositorio en GitHub con:  
-   - Código fuente actualizado.  
-   - Configuración PostgreSQL (`application.yml` o script SQL).  
-   - Swagger/OpenAPI habilitado.  
-   - Clase `ApiResponse<T>` implementada.  
+#### DTOs STOMP
 
-2. Documentación:  
-   - Informe de laboratorio con instrucciones claras.  
-   - Evidencia de consultas en Swagger UI y evidencia de mensajes en la base de datos.  
-   - Breve explicación de buenas prácticas aplicadas.  
+| DTO | Dirección | Campos |
+|-----|-----------|--------|
+| `DrawEvent` | Cliente → Servidor (`/app/draw`) | `author`, `name`, `point` |
+| `BluePrintUpdate` | Servidor → Clientes (`/topic/blueprints.*`) | `author`, `name`, `points` |
+
+#### CORS – `CorsConfig`
+Para permitir la conexión desde el frontend (Vite en `http://localhost:5173`) se configuró:
+```java
+registry.addMapping("/**")
+        .allowedOrigins("http://localhost:5173")
+        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+        .allowedHeaders("*")
+        .allowCredentials(true);
+```
+
+#### Flujo de uso desde un cliente
+```
+1. Conectar al endpoint WS:  ws://localhost:8080/ws-blueprints
+2. Suscribirse a:            /topic/blueprints.{author}.{name}
+3. Enviar puntos a:          /app/draw  →  { "author":"john","name":"house","point":{"x":5,"y":5} }
+4. Recibir broadcast con el blueprint actualizado en el topic suscrito.
+```
 
 ---
 
