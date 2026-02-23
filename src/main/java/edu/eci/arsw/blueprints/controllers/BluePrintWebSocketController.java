@@ -29,7 +29,7 @@ public class BluePrintWebSocketController {
   }
 
   @ResponseBody
-  @GetMapping("/api/blueprints/{author}/{name}")
+  @GetMapping("/api/v1/blueprints/{author}/{name}")
   public BluePrintUpdate get(@PathVariable String author, @PathVariable String name) {
     return new BluePrintUpdate(author, name, List.of(new Point(10,10), new Point(40,50)));
   }
