@@ -11,7 +11,7 @@ import org.springframework.stereotype.Controller;
 public class BluePrintWebSocketController {
 
     private final SimpMessagingTemplate template;
-    private final BlueprintsServices services; // Usamos el mismo servicio que el API REST
+    private final BlueprintsServices services; 
 
     public BluePrintWebSocketController(SimpMessagingTemplate template, BlueprintsServices services) {
         this.template = template;
