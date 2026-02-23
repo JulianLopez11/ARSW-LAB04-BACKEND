@@ -102,19 +102,6 @@ public class BlueprintsAPIController {
         }
     }
 
-    @Operation(summary = "Add a point to a blueprint", description = "Adds a new point to an existing blueprint identified by author and name")
-    @ApiResponse(description = "Point added successfully", responseCode = "202")
-    @ApiResponse(description = "Blueprint not found", responseCode = "404")
-    @PutMapping("/{author}/{bpname}")
-    public ResponseEntity<?> addAuthor (@PathVariable String author, @PathVariable String bpname,
-                                      @RequestBody Point p) {
-        try {
-            services.addPoint(author, bpname, p.x(), p.y());
-            return ResponseEntity.status(HttpStatus.ACCEPTED).body(new ApiResponseRecord<>(202, "Point Added", null));
-        } catch (BlueprintNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponseRecord<>(404, e.getMessage(), null));
-        }
-    }
     // Se añade segun los requerimientos del lab 04
     @PutMapping("/{author}/{bpname}")
     public ResponseEntity<?> updateBlueprint(@PathVariable String author, @PathVariable String bpname,
